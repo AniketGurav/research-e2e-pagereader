@@ -1,14 +1,6 @@
-# pytorch-retinanet
+# pytorch End-to-End Page Reader
 
-![img3](https://github.com/yhenon/pytorch-retinanet/blob/master/images/3.jpg)
-![img5](https://github.com/yhenon/pytorch-retinanet/blob/master/images/5.jpg)
-
-Pytorch  implementation of RetinaNet object detection as described in [Focal Loss for Dense Object Detection](https://arxiv.org/abs/1708.02002) by Tsung-Yi Lin, Priya Goyal, Ross Girshick, Kaiming He and Piotr Dollár.
-
-This implementation is primarily designed to be easy to read and simple to modify.
-
-## Results
-Currently, this repo achieves 33.5% mAP at 600px resolution with a Resnet-50 backbone. The published result is 34.0% mAP. The difference is likely due to the use of Adam optimizer instead of SGD with weight decay.
+Code for the papers [End-To-End Handwritten Text Detection and Transcription in Full Pages](http://www.cvc.uab.es/people/mcarbonell/papers/wml.pdf) and  [TreyNet: A Neural Model for Text Localization, Transcription and Named EntityRecognition in Full Pages](https://arxiv.org/pdf/1912.10016.pdf).
 
 ## Installation
 
@@ -21,144 +13,102 @@ apt-get install tk-dev python-tk
 ```
 
 3) Install the python packages:
-	
-```
-pip install pandas
-pip install pycocotools
-pip install opencv-python
-pip install requests
 
 ```
 
-## Training
+pip3 install torch==1.0.1.post2
 
-The network can be trained using the `train.py` script. Currently, two dataloaders are available: COCO and CSV. For training on coco, use
+pip3 install cffi
+
+pip3 install cython
+
+pip3 install opencv-python
+
+pip3 install requests
+
+pip3 install editdistance
+```
+Warp ctc pytorch: https://github.com/SeanNaren/warp-ctc
+
+Python pagexml: https://github.com/omni-us/pagexml/tree/master/py-pagexml
+
+## Detection and transcription on IAM:
+
+### Prepare data
+Download and extract IAM images and ground truth. You first need to register to the IAM database and set the environment variables for its credentials.
 
 ```
-python train.py --dataset coco --coco_path ../coco --depth 50
+cd datasets/iam
+
+IAM_U=[your IAMDB user]
+IAM_PW=[your IAMDB password]
+
+wget http://www.fki.inf.unibe.ch/DBs/iamDB/data/forms/formsA-D.tgz --user $IAM_U --password $IAM_PW
+wget http://www.fki.inf.unibe.ch/DBs/iamDB/data/forms/formsE-H.tgz --user $IAM_U --password $IAM_PW
+wget http://www.fki.inf.unibe.ch/DBs/iamDB/data/forms/formsI-Z.tgz --user $IAM_U --password $IAM_PW
+
+mkdir forms
+
+tar -C forms -zxvf formsA-D.tgz
+tar -C forms -zxvf formsE-H.tgz
+tar -C forms -zxvf formsI-Z.tgz
+
+wget http://www.fki.inf.unibe.ch/DBs/iamDB/data/ascii/words.txt --user $IAM_U --password $IAM_PW
+```
+Get Aachen train, valid and test partitions
+```
+wget https://raw.githubusercontent.com/jpuigcerver/PyLaia/refactor_kws_egs_master/egs/iam-htr/data/part/forms/aachen/tr.lst
+
+wget https://raw.githubusercontent.com/jpuigcerver/PyLaia/refactor_kws_egs_master/egs/iam-htr/data/part/forms/aachen/te.lst
+
+wget https://raw.githubusercontent.com/jpuigcerver/PyLaia/refactor_kws_egs_master/egs/iam-htr/data/part/forms/aachen/va.lst
+
+python generate_gt_IAM_csv.py words.txt
+
+cd ../..
+
 ```
 
-For training using a custom dataset, with annotations in CSV format (see below), use
+
+### Training, testing and predictions visualization
+
 
 ```
-python train.py --dataset csv --csv_train <path/to/train_annots.csv>  --csv_classes <path/to/train/class_list.csv>  --csv_val <path/to/val_annots.csv>
-```
+./experiments/set_path.sh
 
-Note that the --csv_val argument is optional, in which case no validation will be performed.
+./train_e2e.sh
 
-## Pre-trained model
+./test_e2e.sh
 
-A pre-trained model is available at: 
-- https://drive.google.com/open?id=1yLmjq3JtXi841yXWBxst0coAgR26MNBS (this is a pytorch state dict)
-
-The state dict model can be loaded using:
+./predict_e2e.sh
 
 ```
-retinanet = model.resnet50(num_classes=dataset_train.num_classes(),)
-retinanet.load_state_dict(torch.load(PATH_TO_WEIGHTS))
-```
 
-## Validation
-
-Run `coco_validation.py` to validate the code on the COCO dataset. With the above model, run:
-
-`python coco_validation.py --coco_path ~/path/to/coco --model_path /path/to/model/coco_resnet_50_map_0_335_state_dict.pt`
-
-This produces the following results:
+### Alternatively trained model can be downloaded
 
 ```
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.335
- Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.499
- Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.357
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.167
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.369
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.466
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.282
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.429
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.458
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.255
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.508
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.597
-```
+mkdir trained_models
+wget  -O trained_models/iam_join_det_htr_csv_retinanet.pt https://github.com/manucarbonell/models/blob/master/research-e2e-pagereader/iam_join_det_htr_lstm_csv_retinanet.pt?raw=true
 
-## Visualization
-
-To visualize the network detection, use `visualize.py`:
+./predict_e2e.sh
 
 ```
-python visualize.py --dataset coco --coco_path ../coco --model <path/to/model.pt>
+## Detection, transcription and named entity recognition on IEHHR:
+
+
+### Prepare data
+Download and extract IEHHR images and ground truth from https://rrc.cvc.uab.es/?ch=10&com=downloads.
+
+Convert pagexml ground truth to csv to be read by the dataloader.
 ```
-This will visualize bounding boxes on the validation set. To visualise with a CSV dataset, use:
+python3 pagexml2csv.py --pxml_dir datasets/esposalles/train --fout datasets/esposalles/train.csv --classes_out classes.csv --get_property True --seg_lev TextLine
+python3 pagexml2csv.py --pxml_dir datasets/esposalles/valid --fout datasets/esposalles/valid.csv --classes_out classes.csv --get_property True --seg_lev TextLine
+python3 pagexml2csv.py --pxml_dir datasets/esposalles/test --fout datasets/esposalles/test.csv --classes_out classes.csv --get_property True --seg_lev TextLine
 
-```
-python visualize.py --dataset csv --csv_classes <path/to/train/class_list.csv>  --csv_val <path/to/val_annots.csv> --model <path/to/model.pt>
-```
-
-## Model
-
-The retinanet model uses a resnet backbone. You can set the depth of the resnet model using the --depth argument. Depth must be one of 18, 34, 50, 101 or 152. Note that deeper models are more accurate but are slower and use more memory.
-
-## CSV datasets
-The `CSVGenerator` provides an easy way to define your own datasets.
-It uses two CSV files: one file containing annotations and one file containing a class name to ID mapping.
-
-### Annotations format
-The CSV file with annotations should contain one annotation per line.
-Images with multiple bounding boxes should use one row per bounding box.
-Note that indexing for pixel values starts at 0.
-The expected format of each line is:
-```
-path/to/image.jpg,x1,y1,x2,y2,class_name
 ```
 
-Some images may not contain any labeled objects.
-To add these images to the dataset as negative examples,
-add an annotation where `x1`, `y1`, `x2`, `y2` and `class_name` are all empty:
+Run experiment
 ```
-path/to/image.jpg,,,,,
+./experiments/run.sh esposalles
+
 ```
-
-A full example:
-```
-/data/imgs/img_001.jpg,837,346,981,456,cow
-/data/imgs/img_002.jpg,215,312,279,391,cat
-/data/imgs/img_002.jpg,22,5,89,84,bird
-/data/imgs/img_003.jpg,,,,,
-```
-
-This defines a dataset with 3 images.
-`img_001.jpg` contains a cow.
-`img_002.jpg` contains a cat and a bird.
-`img_003.jpg` contains no interesting objects/animals.
-
-
-### Class mapping format
-The class name to ID mapping file should contain one mapping per line.
-Each line should use the following format:
-```
-class_name,id
-```
-
-Indexing for classes starts at 0.
-Do not include a background class as it is implicit.
-
-For example:
-```
-cow,0
-cat,1
-bird,2
-```
-
-## Acknowledgements
-
-- Significant amounts of code are borrowed from the [keras retinanet implementation](https://github.com/fizyr/keras-retinanet)
-- The NMS module used is from the [pytorch faster-rcnn implementation](https://github.com/ruotianluo/pytorch-faster-rcnn)
-
-## Examples
-
-![img1](https://github.com/yhenon/pytorch-retinanet/blob/master/images/1.jpg)
-![img2](https://github.com/yhenon/pytorch-retinanet/blob/master/images/2.jpg)
-![img4](https://github.com/yhenon/pytorch-retinanet/blob/master/images/4.jpg)
-![img6](https://github.com/yhenon/pytorch-retinanet/blob/master/images/6.jpg)
-![img7](https://github.com/yhenon/pytorch-retinanet/blob/master/images/7.jpg)
-![img8](https://github.com/yhenon/pytorch-retinanet/blob/master/images/8.jpg)
