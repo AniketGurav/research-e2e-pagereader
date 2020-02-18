@@ -74,7 +74,11 @@ cd ../..
 
 
 ```
-./experiments/set_path.sh
+mkdir trained_models
+
+echo "text,0" > binary_class.csv
+
+source experiments/set_path.sh
 
 ./train_e2e.sh
 
