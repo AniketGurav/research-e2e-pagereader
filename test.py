@@ -23,7 +23,6 @@ import losses
 from dataloader import CSVDataset, collater, Resizer, AspectRatioBasedSampler, Augmenter, UnNormalizer, Normalizer
 from torch.utils.data import Dataset, DataLoader
 
-import csv_eval_binary_map 
 import csv_eval
 
 from get_transcript import get_transcript
