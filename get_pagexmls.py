@@ -24,6 +24,7 @@ print(('CUDA available: {}'.format(torch.cuda.is_available())))
 
 
 
+sm = torch.nn.Softmax()
 
 def generate_pagexml(image_id,data,retinanet,score_threshold,nms_threshold,dataset_val):
     image_name = image_id+'.jpg'
@@ -73,13 +74,13 @@ def generate_pagexml(image_id,data,retinanet,score_threshold,nms_threshold,datas
         words = []
         for k in range(len(dataset_val.labels)):
             cv2.putText(img,dataset_val.labels[k],(25,25+k*15), cv2.FONT_HERSHEY_PLAIN, 1, colors[k], 2)
-        transcriptions= np.argmax(transcriptions.cpu(),axis=-1)
+        transcription_values= np.argmax(transcriptions.cpu(),axis=-1)
         for box_id in range(n_boxes_predicted):
 
             # Initialize object for setting confidence values
             box = {}
             bbox = transformed_anchors[box_id, :]
-            transcription = transcriptions[box_id,:]
+            transcription = transcription_values[box_id,:]
             x1 = int(bbox[0])
             y1 = int(bbox[1])
             x2 = int(bbox[2])
@@ -92,7 +93,8 @@ def generate_pagexml(image_id,data,retinanet,score_threshold,nms_threshold,datas
             word = pxml.addWord(line,"ID"+str(box_id))
             
             # Set text region bounding box with a confidence
-            pxml.setCoordsBBox(word,x1, y1, x2-x1, y2-y1, conf )
+            conf.assign(float(scores[box_id]))
+            pxml.setCoordsBBox(word,x1, y1, x2-x1, y2-y1, conf)
             
             #pxml.setCoordsBBox( reg,x1, y1, x2-x1, y2-y1, conf )
             #transcription = transcripts[j]    
@@ -101,7 +103,9 @@ def generate_pagexml(image_id,data,retinanet,score_threshold,nms_threshold,datas
 
 
             # Set the text for the text region
-            conf.assign(0.9)
+            conf_val = float(sm(transcriptions[box_id,:]).max(dim=1)[0][sm(transcriptions[box_id,:]).max(dim=1)[1]!=0].min())
+
+            conf.assign(conf_val)
             pxml.setTextEquiv(word, transcription, conf )
 
             # Add property to text region
@@ -144,7 +148,7 @@ def get_n_random_colors(n):
     #for i in range(n):
         #color = (int(255*np.random.random()),int(255*np.random.random()),int(255*np.random.random()))
         #colors.append(color)
-    colors=[(255,255,255),(255,0,0),(0,255,0),(255,0,255),(0,255,255),(122,122,0)]
+    colors=[(0,0,0),(255,0,0),(0,255,0),(255,0,255),(0,255,255),(122,122,0),(0,122,0)]
     return colors
 def main(args=None):
     parser = argparse.ArgumentParser(description='Simple training script for training a RetinaNet network.')
@@ -212,7 +216,6 @@ def main(args=None):
         print("Get more preds?")
         '''continue_eval =raw_input()
         if continue_eval!='n' and continue_eval!='N': continue
-        else: sys.exit()'''
-
+        else: '''
 if __name__ == '__main__':
  main()
