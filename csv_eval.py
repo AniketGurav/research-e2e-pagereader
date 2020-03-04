@@ -155,6 +155,7 @@ def _get_annotations(generator):
 
 def calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,binary,generator,retinanet,iou_threshold=0.5,score_threshold=0.05,max_detections=400,save_path=None):
     average_precisions = {}
+    f1=[]
     cers=[]
     if binary:
         n_classes = 1
@@ -230,10 +231,13 @@ def calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,
         # compute recall and precision
         recall    = true_positives / num_annotations
         precision = true_positives / np.maximum(true_positives + false_positives, np.finfo(np.float64).eps)
+        
 
         # compute average precision
         average_precision  = _compute_ap(recall, precision)
         average_precisions[label] = average_precision, num_annotations
+        if len(recall)>0 and len(precision)>0:
+            f1.append(( 2 * recall[-1]*precision[-1] )/(recall[-1]+precision[-1]))
         
     if binary:#retinanet.module.binary_classifier:
         for label in range(1):#generator.num_classes()):
@@ -249,6 +253,7 @@ def calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,
     for k,v in average_precisions.items():
         mAPs.append(v[0])
     mAP=np.mean(mAPs)
+    print ('F1 score',np.mean(f1))
     print('mAP',mAP)
     print("Per box CER",np.mean(cers)) 
     cer = np.mean(cers)
