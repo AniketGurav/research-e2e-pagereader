@@ -36,6 +36,15 @@ def compute_overlap(a, b):
     return intersection / ua
 
 
+def _compute_f1(recall,precision):
+    ''' compute f1 score given recall and precision curves
+    '''
+    recall = float(recall[-1])
+    precision = float(precision[-1])
+    f1 = (2* precision*recall)/(precision + recall)
+    return f1
+
+
 def _compute_ap(recall, precision):
     """ Compute the average precision, given the recall and precision curves.
     Code originally from https://github.com/rbgirshick/py-faster-rcnn.
@@ -79,8 +88,8 @@ def _get_detections(dataset, retinanet, score_threshold=0.05, max_detections=100
     all_detections = [[None for i in range(dataset.num_classes())] for j in range(len(dataset))]
     all_transcriptions = {}
     retinanet.eval()
+    ###### DEBUG
     with torch.no_grad():
-
         for index in range(len(dataset)):
             data = dataset[index]
             scale = data['scale']
@@ -155,12 +164,14 @@ def _get_annotations(generator):
 
 def calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,binary,generator,retinanet,iou_threshold=0.5,score_threshold=0.05,max_detections=400,save_path=None):
     average_precisions = {}
-    f1=[]
+    f1s={}
     cers=[]
     if binary:
         n_classes = 1
     else:
         n_classes = generator.num_classes()
+
+    num_annotations_total = 0
     for label in range(n_classes):#generator.num_classes()):
         false_positives = np.zeros((0,))
         true_positives  = np.zeros((0,))
@@ -171,8 +182,19 @@ def calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,
             if binary:
                 detections           = np.concatenate(all_detections[i][:])#all_detections[i][label]
                 annotations          = np.concatenate(all_annotations[i][:])#label]
-                text_dets = np.concatenate([all_text_preds.get(i,{}).get(lab,{}) for lab in range(generator.num_classes())])
-                text_annots = np.concatenate([all_text_annots.get(i,{}).get(lab,{}) for lab in range(generator.num_classes())])
+                text_dets =[all_text_preds.get(i,{}).get(lab,{}) for lab in range(generator.num_classes())]
+                text_annots = [all_text_annots.get(i,{}).get(lab,{}) for lab in range(generator.num_classes())]
+                if len(text_dets)>1 and len(text_annots)>1:
+                    
+                    try:
+                        text_dets = np.concatenate(text_dets)
+
+                    except:
+                        text_dets=np.zeros(detections.shape[0])
+                    text_annots = np.concatenate(text_annots)
+                else:
+                    text_dets=np.zeros(detections.shape[0])
+                    text_annots=np.zeros(annotations.shape[0])
             else:
                 detections           = all_detections[i][label]
                 annotations          = all_annotations[i][label]
@@ -236,9 +258,14 @@ def calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,
         # compute average precision
         average_precision  = _compute_ap(recall, precision)
         average_precisions[label] = average_precision, num_annotations
-        if len(recall)>0 and len(precision)>0:
-            f1.append(( 2 * recall[-1]*precision[-1] )/(recall[-1]+precision[-1]))
         
+        f1 = _compute_f1(recall,precision)
+        f1s[label] =f1
+
+        #if len(recall)>0 and len(precision)>0:
+        #    if float(recall[-1]+precision[-1])>0:
+        #        f1.append(( 2 * float(recall[-1]*precision[-1] ))/float(recall[-1]+precision[-1]))
+        num_annotations_total+=num_annotations
     if binary:#retinanet.module.binary_classifier:
         for label in range(1):#generator.num_classes()):
             label_name = 'Text'#generator.label_to_name(label)
@@ -250,10 +277,17 @@ def calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,
             print('{}: {}'.format(label_name, average_precisions[label][0]))
 
     mAPs=[]
+    F1s=[]
     for k,v in average_precisions.items():
         mAPs.append(v[0])
     mAP=np.mean(mAPs)
-    print ('F1 score',np.mean(f1))
+
+    for k,v in f1s.items():
+        F1s.append(v)
+
+    f1 = np.mean(F1s)
+
+    print ('F1 score',f1)
     print('mAP',mAP)
     print("Per box CER",np.mean(cers)) 
     cer = np.mean(cers)
@@ -285,10 +319,10 @@ def evaluate(
     all_detections,all_text_preds     = _get_detections(generator, retinanet, score_threshold=score_threshold, max_detections=max_detections, save_path=save_path)
     all_annotations,all_text_annots    = _get_annotations(generator)
     binary=False
-    print('NER recognition')
+    print('\nNER recognition\n')
     mAP,cer = calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,binary,generator,retinanet)
     binary=True
-    print('Text recognition')
+    print('\nText recognition\n')
     binary_mAP,binary_cer = calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,binary,generator,retinanet)
     return mAP,binary_mAP,binary_cer
 
