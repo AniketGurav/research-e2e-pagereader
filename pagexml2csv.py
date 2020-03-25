@@ -33,7 +33,7 @@ def get_coords_and_transcript(pxml,textobject,key):
         if '<' in w:
             w = w.split('>')[1].split('<')[0]
     '''
-    w= regex.sub('', w)
+    #w= regex.sub('', w)
            
     line_transcript.append(w)
     line_transcript = " ".join(line_transcript)
