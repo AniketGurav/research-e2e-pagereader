@@ -39,9 +39,13 @@ def compute_overlap(a, b):
 def _compute_f1(recall,precision):
     ''' compute f1 score given recall and precision curves
     '''
-    recall = float(recall[-1])
-    precision = float(precision[-1])
-    f1 = (2* precision*recall)/(precision + recall)
+    if len(recall)>0 and len(precision)>0: 
+        recall = float(recall[-1])
+        precision = float(precision[-1])
+
+        f1 = (2* precision*recall)/(precision + recall)
+    else:
+        f1 =0
     return f1
 
 
